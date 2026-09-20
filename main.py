@@ -15,12 +15,15 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 COGS = ["stone", "fun", "admin", "honor", "events", "uwufy", "bartender"]
 
 
+GUILD_ID = 1205588718077874247
+
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
-    await bot.tree.sync()
-    print("Slash commands synced.")
-
+    guild = discord.Object(id=GUILD_ID)
+    bot.tree.copy_global_to(guild=guild)
+    synced = await bot.tree.sync(guild=guild)
+    print(f"Slash commands synced to guild ({len(synced)} commands).")
 async def load_cogs():
     for cog in COGS:
         try:
