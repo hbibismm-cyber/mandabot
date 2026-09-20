@@ -1,43 +1,3 @@
-from __future__ import annotations
- 
-import random
-import re
-import time
-from dataclasses import dataclass, field
-from typing import Dict, Optional
- 
-import discord
-from discord import app_commands
-from discord.ext import commands, tasks
- 
-# ---------------------------------------------------------------------------
-# Config: booze choices
-# ---------------------------------------------------------------------------
- 
-# A gif shown whenever someone opens the bar. Swap this for whatever you like,
-# or make it a list and pick randomly.
-BAR_GIF_URL = "https://tenor.com/view/kitten-drink-milk-bar-cat-gif-11501109593153103379"
- 
-@dataclass(frozen=True)
-class Booze:
-    key: str
-    label: str
-    emoji: str
-    description: str
-    intensity: float   # 0.0 (stone sober) - 1.0 (can barely type)
-    duration: int       # seconds the effect lasts
- 
- 
-BOOZE_MENU = [
-    Booze("beer", "Beer", "🍺", "Basic Ass", intensity=0.20, duration=90),
-    Booze("wine", "Wine", "🍷", "Divorced Mom", intensity=0.35, duration=150),
-    Booze("cocktail", "Cocktail", "🍸", "mediocre", intensity=0.55, duration=210),
-    Booze("shot", "Whiskey Shot", "🥃", "Hits Hard", intensity=0.75, duration=180),
-    Booze("moonshine", "Moonshine", "💀", "OOuGhHH", intensity=0.95, duration=300),
-]
- 
-WEBHOOK_NAME = "bartender-impersonator"
- 
  
 # ---------------------------------------------------------------------------
 # The "drunk" text filter
@@ -224,6 +184,7 @@ class Bartender(commands.Cog):
         try:
             webhooks = await channel.webhooks()
         except discord.Forbidden:
+            print(f"[bartender] missing permission to list webhooks in #{channel.name}")
             return None
  
         webhook = discord.utils.get(webhooks, name=WEBHOOK_NAME)
@@ -231,6 +192,10 @@ class Bartender(commands.Cog):
             try:
                 webhook = await channel.create_webhook(name=WEBHOOK_NAME)
             except discord.Forbidden:
+                print(f"[bartender] missing permission to create webhook in #{channel.name}")
+                return None
+            except discord.HTTPException as e:
+                print(f"[bartender] failed to create webhook in #{channel.name}: {e.status} {e.text}")
                 return None
  
         self._webhook_cache[channel.id] = webhook
@@ -309,8 +274,14 @@ class Bartender(commands.Cog):
                 files=[await a.to_file() for a in message.attachments] if message.attachments else None,
                 allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=True),
             )
-        except discord.HTTPException:
-            pass
+        except discord.HTTPException as e:
+            print(f"[bartender] webhook.send failed ({e.status}): {e.text}")
+            # fall back to a plain bot message so the user still sees *something*
+            if slurred:
+                try:
+                    await message.channel.send(f"**{display_name}:** {slurred}")
+                except discord.HTTPException as e2:
+                    print(f"[bartender] fallback send also failed ({e2.status}): {e2.text}")
  
  
 async def setup(bot: commands.Bot):
